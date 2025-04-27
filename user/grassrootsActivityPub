@@ -1,0 +1,12 @@
+{
+  "@context": "https://www.w3.org/ns/activitystreams",
+  "id": "https://grassrootsactivitypub.onrender.com/user/grassrootsActivityPub",
+  "type": "Person",
+  "preferredUsername": "grassrootsActivityPub",
+  "inbox": "https://grassrootsactivitypub.onrender.com/inbox",
+  "publicKey": {
+    "id": "https://grassrootsactivitypub.onrender.com/user/grassrootsActivityPub#main-key",
+    "owner": "https://grassrootsactivitypub.onrender.com/user/grassrootsActivityPub",
+    "publicKeyPem": "YOUR PUBLIC KEY HERE"
+  }
+}
