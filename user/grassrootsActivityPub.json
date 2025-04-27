@@ -1,12 +1,12 @@
 {
   "@context": "https://www.w3.org/ns/activitystreams",
-  "id": "https://yourdomain.onrender.com/user/grassrootsActivityPub",
+  "id": "https://grassrootsactivitypub.onrender.com/user/grassrootsActivityPub",
   "type": "Person",
   "preferredUsername": "grassrootsActivityPub",
-  "inbox": "https://yourdomain.onrender.com/inbox",
+  "inbox": "https://grassrootsactivitypub.onrender.com/inbox",
   "publicKey": {
-    "id": "https://yourdomain.onrender.com/user/grassrootsActivityPub#main-key",
-    "owner": "https://yourdomain.onrender.com/user/grassrootsActivityPub",
+    "id": "https://grassrootsactivitypub.onrender.com/user/grassrootsActivityPub#main-key",
+    "owner": "https://grassrootsactivitypub.onrender.com/user/grassrootsActivityPub",
     "publicKeyPem": "YOUR PUBLIC KEY HERE"
   }
 }
