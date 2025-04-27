@@ -1,0 +1,10 @@
+{
+  "subject": "acct:grassrootsActivityPub@yourdomain.onrender.com",
+  "links": [
+    {
+      "rel": "self",
+      "type": "application/activity+json",
+      "href": "https://yourdomain.onrender.com/user/grassrootsActivityPub"
+    }
+  ]
+}
