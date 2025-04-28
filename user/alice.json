@@ -1,0 +1,15 @@
+{
+  "@context": "https://www.w3.org/ns/activitystreams",
+  "id": "http://localhost:3000/user/alice",
+  "type": "Person",
+  "preferredUsername": "alice",
+  "inbox": "http://localhost:3000/inbox/alice",
+  "outbox": "http://localhost:3000/outbox/alice",
+  "followers": "http://localhost:3000/user/alice/followers",
+  "following": "http://localhost:3000/user/alice/following",
+  "publicKey": {
+    "id": "http://localhost:3000/user/alice#main-key",
+    "owner": "http://localhost:3000/user/alice",
+    "publicKeyPem": "YOUR PUBLIC KEY HERE"
+  }
+}

@@ -1,10 +1,10 @@
 {
-  "subject": "acct:grassrootsActivityPub@grassrootsactivitypub.onrender.com",
+  "subject": "acct:grassrootsActivityPub@grassrootsactivitypub2.onrender.com",
   "links": [
     {
       "rel": "self",
       "type": "application/activity+json",
-      "href": "https://grassrootsactivitypub.onrender.com/user/grassrootsActivityPub"
+      "href": "https://grassrootsactivitypub2.onrender.com/user/grassrootsActivityPub"
     }
   ]
 }
