@@ -1,6 +1,7 @@
 {
-    "name": "grassroots-activitypub",
+    "name": "grassroots-activitypub2",
     "version": "1.0.0",
+    "description": "GrassrootsActivityPub2 server for ActivityPub endpoint",
     "main": "server.js",
     "scripts": {
       "start": "node server.js"
