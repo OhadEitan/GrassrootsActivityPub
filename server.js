@@ -1,27 +1,101 @@
 const express = require('express');
-const path = require('path');
+const bodyParser = require('body-parser');
 const app = express();
-const PORT = process.env.PORT || 3000;
 
-// Middleware to parse JSON bodies
-app.use(express.json());
+// Enable body parsing for JSON data
+app.use(bodyParser.json());
 
-// Serve static files (index.html, .well-known, user)
-app.use(express.static(path.join(__dirname)));
+// User profiles for Alice and Bob
+const users = {
+  alice: {
+    preferredUsername: 'alice',
+    inbox: 'https://grassrootsactivitypub2.onrender.com/inbox/alice',
+    publicKey: {
+      id: 'https://grassrootsactivitypub2.onrender.com/user/alice#main-key',
+      owner: 'https://grassrootsactivitypub2.onrender.com/user/alice',
+      publicKeyPem: 'YOUR_PUBLIC_KEY_FOR_ALICE',
+    },
+  },
+  bob: {
+    preferredUsername: 'bob',
+    inbox: 'https://grassrootsactivitypub2.onrender.com/inbox/bob',
+    publicKey: {
+      id: 'https://grassrootsactivitypub2.onrender.com/user/bob#main-key',
+      owner: 'https://grassrootsactivitypub2.onrender.com/user/bob',
+      publicKeyPem: 'YOUR_PUBLIC_KEY_FOR_BOB',
+    },
+  },
+};
 
-// Inbox endpoint (ActivityPub POST)
-app.post('/inbox', (req, res) => {
-    console.log('📩 Received a POST to /inbox:');
-    console.log(JSON.stringify(req.body, null, 2));
-    res.status(200).send('OK');
+// Serve Alice's profile
+app.get('/user/alice', (req, res) => {
+  res.json({
+    '@context': 'https://www.w3.org/ns/activitystreams',
+    id: 'https://grassrootsactivitypub2.onrender.com/user/alice',
+    type: 'Person',
+    preferredUsername: users.alice.preferredUsername,
+    inbox: users.alice.inbox,
+    publicKey: users.alice.publicKey,
+  });
 });
 
-// Default fallback for 404s
-app.use((req, res, next) => {
+// Serve Bob's profile
+app.get('/user/bob', (req, res) => {
+  res.json({
+    '@context': 'https://www.w3.org/ns/activitystreams',
+    id: 'https://grassrootsactivitypub2.onrender.com/user/bob',
+    type: 'Person',
+    preferredUsername: users.bob.preferredUsername,
+    inbox: users.bob.inbox,
+    publicKey: users.bob.publicKey,
+  });
+});
+
+// WebFinger for Alice
+app.get('/.well-known/webfinger', (req, res) => {
+  const { resource } = req.query;
+  if (resource === 'acct:alice@grassrootsactivitypub2.onrender.com') {
+    res.json({
+      subject: 'acct:alice@grassrootsactivitypub2.onrender.com',
+      links: [
+        {
+          rel: 'self',
+          type: 'application/activity+json',
+          href: 'https://grassrootsactivitypub2.onrender.com/user/alice',
+        },
+      ],
+    });
+  } else if (resource === 'acct:bob@grassrootsactivitypub2.onrender.com') {
+    res.json({
+      subject: 'acct:bob@grassrootsactivitypub2.onrender.com',
+      links: [
+        {
+          rel: 'self',
+          type: 'application/activity+json',
+          href: 'https://grassrootsactivitypub2.onrender.com/user/bob',
+        },
+      ],
+    });
+  } else {
     res.status(404).send('Not Found');
+  }
+});
+
+// Inbox endpoint for receiving messages (activity objects)
+app.post('/inbox/:username', (req, res) => {
+  const username = req.params.username;
+  const activity = req.body;
+
+  if (username !== 'alice' && username !== 'bob') {
+    return res.status(404).send('User not found');
+  }
+
+  console.log(`Received activity for ${username}:`, activity);
+  res.json({ status: 'Message received' });
 });
 
 // Start server
-app.listen(PORT, () => {
-    console.log(`✅ Server running at http://localhost:${PORT}`);
+const port = process.env.PORT || 3000;
+app.listen(port, () => {
+  console.log(`ActivityPub server is running at http://localhost:${port}`);
 });
