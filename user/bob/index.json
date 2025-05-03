@@ -1,15 +1,15 @@
 {
   "@context": "https://www.w3.org/ns/activitystreams",
-  "id": "http://localhost:3000/user/bob",
+  "id": "https://grassrootsactivitypub2.onrender.com/user/bob",
   "type": "Person",
   "preferredUsername": "bob",
-  "inbox": "http://localhost:3000/inbox/bob",
-  "outbox": "http://localhost:3000/outbox/bob",
-  "followers": "http://localhost:3000/user/bob/followers",
-  "following": "http://localhost:3000/user/bob/following",
+  "inbox": "https://grassrootsactivitypub2.onrender.com/inbox/bob",
+  "outbox": "https://grassrootsactivitypub2.onrender.com/outbox/bob",
+  "followers": "https://grassrootsactivitypub2.onrender.com/user/bob/followers",
+  "following": "https://grassrootsactivitypub2.onrender.com/user/bob/following",
   "publicKey": {
-    "id": "http://localhost:3000/user/bob#main-key",
-    "owner": "http://localhost:3000/user/bob",
+    "id": "https://grassrootsactivitypub2.onrender.com/user/bob#main-key",
+    "owner": "https://grassrootsactivitypub2.onrender.com/user/bob",
     "publicKeyPem": "YOUR PUBLIC KEY HERE"
   }
-  }
+}
