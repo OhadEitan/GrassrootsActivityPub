@@ -30,6 +30,7 @@ const activities = {
   bob: []
 };
 
+
 // Alice's inbox
 app.post('/inbox/alice', (req, res) => {
   const activity = req.body;
@@ -271,6 +272,11 @@ app.post('/like', (req, res) => {
     res.status(200).json({ status: 'Like activity processed' });
  });
 
+ app.get('/', (req, res) => {
+    res.send('Welcome to Grassroots ActivityPub server!');
+  });
+  
+  
 // Start the server
 httpServer.listen(port, () => {
     console.log(`HTTP Server running on port ${port}`);
