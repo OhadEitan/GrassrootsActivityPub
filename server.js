@@ -58,6 +58,63 @@ function createHTTPSignature({ privateKey, keyId, headers }) {
   return `keyId="${keyId}",algorithm="rsa-sha256",headers="(request-target) host date digest",signature="${signature}"`;
 }
 
+function generateUserKeyPair(username) {
+    const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', {
+      modulusLength: 2048,
+      publicKeyEncoding: {
+        type: 'spki',
+        format: 'pem',
+      },
+      privateKeyEncoding: {
+        type: 'pkcs8',
+        format: 'pem',
+      },
+    });
+  
+    const userDir = path.join(__dirname, 'user', username);
+    fs.writeFileSync(path.join(userDir, 'private-key.pem'), privateKey);
+    fs.writeFileSync(path.join(userDir, 'public-key.pem'), publicKey);
+  
+    return { publicKey, privateKey };
+  }
+
+  function encryptMessage(publicKeyPem, message) {
+    const bufferMessage = Buffer.from(message, 'utf8');
+    const encrypted = crypto.publicEncrypt(publicKeyPem, bufferMessage);
+    return encrypted.toString('base64');
+  }
+
+  function decryptMessage(privateKeyPem, encryptedMessage) {
+    const bufferEncrypted = Buffer.from(encryptedMessage, 'base64');
+    const decrypted = crypto.privateDecrypt(privateKeyPem, bufferEncrypted);
+    return decrypted.toString('utf8');
+  }
+
+  const inboxDir = path.join(__dirname, 'inbox', recipient.toLowerCase());
+    if (!fs.existsSync(inboxDir)) fs.mkdirSync(inboxDir, { recursive: true });
+fs.writeFileSync(path.join(inboxDir, `${Date.now()}.json`), JSON.stringify({ encryptedMessage }, null, 2));
+
+app.get('/decrypt/:username', (req, res) => {
+    const username = req.params.username.toLowerCase();
+    const inboxDir = path.join(__dirname, 'inbox', username);
+    const privateKeyPath = path.join(__dirname, 'user', username, 'private-key.pem');
+  
+    if (!fs.existsSync(inboxDir) || !fs.existsSync(privateKeyPath)) {
+      return res.status(404).json({ error: 'Inbox or private key not found.' });
+    }
+  
+    const privateKeyPem = fs.readFileSync(privateKeyPath, 'utf8');
+    const files = fs.readdirSync(inboxDir).sort();
+    const decryptedMessages = files.map(filename => {
+      const content = fs.readFileSync(path.join(inboxDir, filename));
+      const { encryptedMessage } = JSON.parse(content);
+      const decrypted = decryptMessage(privateKeyPem, encryptedMessage);
+      return { filename, decrypted };
+    });
+  
+    res.json(decryptedMessages);
+  });
+
 // Inbox endpoints
 app.post('/inbox/alice', (req, res) => {
   console.log('📥 Message received for Alice');
