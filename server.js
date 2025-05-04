@@ -90,9 +90,7 @@ function generateUserKeyPair(username) {
     return decrypted.toString('utf8');
   }
 
-  const inboxDir = path.join(__dirname, 'inbox', recipient.toLowerCase());
-    if (!fs.existsSync(inboxDir)) fs.mkdirSync(inboxDir, { recursive: true });
-fs.writeFileSync(path.join(inboxDir, `${Date.now()}.json`), JSON.stringify({ encryptedMessage }, null, 2));
+
 
 app.get('/decrypt/:username', (req, res) => {
     const username = req.params.username.toLowerCase();
@@ -287,7 +285,7 @@ app.post('/send-message', async (req, res) => {
       }
     };
   
-    // Save to sender's outbox
+    // Save plaintext activity to sender's outbox
     const outboxDir = path.join(__dirname, 'outbox', sender.toLowerCase());
     if (!fs.existsSync(outboxDir)) fs.mkdirSync(outboxDir, { recursive: true });
     fs.writeFileSync(path.join(outboxDir, `${Date.now()}.json`), JSON.stringify(activity, null, 2));
@@ -295,7 +293,15 @@ app.post('/send-message', async (req, res) => {
     if (sender.toLowerCase() === 'alice') activities.alice.push(activity);
     if (sender.toLowerCase() === 'bob') activities.bob.push(activity);
   
-    // Prepare HTTP Signature headers
+    // Encrypt message for recipient
+    const recipientKeyPath = path.join(__dirname, 'user', recipient.toLowerCase(), 'public-key.pem');
+    if (!fs.existsSync(recipientKeyPath)) {
+      return res.status(404).json({ error: `Public key for ${recipient} not found` });
+    }
+  
+    const recipientPublicKey = fs.readFileSync(recipientKeyPath, 'utf8');
+    const encryptedMessage = encryptMessage(recipientPublicKey, content);
+  
     const inboxPath = `/inbox/${recipient.toLowerCase()}`;
     const inboxUrl = `${base}${inboxPath}`;
     const date = new Date().toUTCString();
@@ -307,34 +313,37 @@ app.post('/send-message', async (req, res) => {
       keyId,
       headers: { recipient, date, digest }
     });
-    console.log('📦 Signature Header:', signatureHeader);
+  
     const headers = {
-        'Host': 'grassrootsactivitypub2.onrender.com',
-        'Date': date,
-        'Digest': digest,
-        'Content-Type': 'application/json',
-        'Signature': signatureHeader
-      };
-      
-    console.log('🧾 Full headers being sent to inbox:');
-    console.log(headers);
-
+      'Host': 'grassrootsactivitypub2.onrender.com',
+      'Date': date,
+      'Digest': digest,
+      'Content-Type': 'application/json',
+      'Signature': signatureHeader
+    };
+  
+    console.log('📦 Signature Header:', signatureHeader);
+    console.log('🧾 Full headers being sent to inbox:', headers);
+  
     try {
+      // POST plaintext activity (for remote server) — can be encrypted JSON too
       const response = await fetch(inboxUrl, {
         method: 'POST',
-        headers: {
-          'Host': 'grassrootsactivitypub2.onrender.com',
-          'Date': date,
-          'Digest': digest,
-          'Content-Type': 'application/json',
-          'Signature': signatureHeader
-        },
+        headers,
         body: JSON.stringify(activity)
       });
   
+      // Save encrypted message locally
+      const inboxDir = path.join(__dirname, 'inbox', recipient.toLowerCase());
+      if (!fs.existsSync(inboxDir)) fs.mkdirSync(inboxDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(inboxDir, `${Date.now()}.json`),
+        JSON.stringify({ encryptedMessage }, null, 2)
+      );
+  
       if (response.ok) {
-        console.log(`📬 Message from ${sender} to ${recipient} sent and signed`);
-        res.status(200).json({ status: 'Message sent and signed successfully' });
+        console.log(`📬 Message from ${sender} to ${recipient} sent and encrypted`);
+        res.status(200).json({ status: 'Message sent and encrypted successfully' });
       } else {
         console.error(`❌ Failed to deliver message: HTTP ${response.status}`);
         res.status(response.status).json({ error: 'Failed to deliver message' });
@@ -344,7 +353,7 @@ app.post('/send-message', async (req, res) => {
       res.status(500).json({ error: 'Failed to send signed message' });
     }
   });
-
+  
 // Follow
 app.post('/follow', (req, res) => {
   const { actor, target } = req.body;

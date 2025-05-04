@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Decrypt Message</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 2em;
+      background: #f2f2f2;
+    }
+    textarea, input {
+      width: 100%;
+      margin: 1em 0;
+      padding: 0.5em;
+      font-family: monospace;
+    }
+    button {
+      padding: 0.75em;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    .output {
+      background: #fff;
+      padding: 1em;
+      border: 1px solid #ccc;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <h1>🔑 Decrypt Message</h1>
+
+  <label for="privateKey">Paste your Private Key (PEM):</label>
+  <textarea id="privateKey" rows="10" placeholder="-----BEGIN PRIVATE KEY-----\n..."></textarea>
+
+  <label for="cipherText">Paste Encrypted Message (Base64):</label>
+  <textarea id="cipherText" rows="5"></textarea>
+
+  <button onclick="decryptMessage()">Decrypt</button>
+
+  <h3>Plaintext Output:</h3>
+  <div class="output" id="plaintext"></div>
+
+  <script>
+    async function decryptMessage() {
+      const privateKeyPem = document.getElementById('privateKey').value;
+      const encryptedBase64 = document.getElementById('cipherText').value;
+
+      try {
+        // Import private key
+        const privateKey = await window.crypto.subtle.importKey(
+          'pkcs8',
+          pemToArrayBuffer(privateKeyPem),
+          {
+            name: 'RSA-OAEP',
+            hash: 'SHA-256',
+          },
+          false,
+          ['decrypt']
+        );
+
+        const encryptedData = Uint8Array.from(atob(encryptedBase64), c => c.charCodeAt(0));
+        const decrypted = await window.crypto.subtle.decrypt(
+          { name: 'RSA-OAEP' },
+          privateKey,
+          encryptedData
+        );
+
+        const decoder = new TextDecoder();
+        document.getElementById('plaintext').textContent = decoder.decode(decrypted);
+      } catch (e) {
+        console.error(e);
+        document.getElementById('plaintext').textContent = '❌ Decryption failed';
+      }
+    }
+
+    function pemToArrayBuffer(pem) {
+      const b64 = pem.replace(/-----[^-]+-----/g, '').replace(/\s/g, '');
+      const binary = atob(b64);
+      const buffer = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) {
+        buffer[i] = binary.charCodeAt(i);
+      }
+      return buffer.buffer;
+    }
+  </script>
+</body>
+</html>
