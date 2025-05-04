@@ -23,6 +23,15 @@ app.get('/user/bob', (req, res) => {
   res.sendFile(path.join(__dirname, 'user', 'bob', 'index.json'));
 });
 
+app.get('/user/:username', (req, res) => {
+    const profilePath = path.join(__dirname, 'user', req.params.username, 'index.json');
+    if (fs.existsSync(profilePath)) {
+      res.sendFile(profilePath);
+    } else {
+      res.status(404).json({ error: 'User not found' });
+    }
+  });
+  
 const followers = { alice: [], bob: [] };
 const activities = { alice: [], bob: [] };
 
@@ -107,6 +116,41 @@ app.get('/user/bob/following', (req, res) => {
     "orderedItems": []
   });
 });
+
+app.post('/create-user/:username', (req, res) => {
+    const username = req.params.username.toLowerCase();
+    const userDir = path.join(__dirname, 'user', username);
+    const inboxDir = path.join(__dirname, 'inbox', username);
+    const outboxDir = path.join(__dirname, 'outbox', username);
+  
+    if (fs.existsSync(userDir)) {
+      return res.status(400).json({ error: `User '${username}' already exists.` });
+    }
+  
+    fs.mkdirSync(userDir, { recursive: true });
+    fs.mkdirSync(inboxDir, { recursive: true });
+    fs.mkdirSync(outboxDir, { recursive: true });
+  
+    const profile = {
+      "@context": "https://www.w3.org/ns/activitystreams",
+      "id": `${base}/user/${username}`,
+      "type": "Person",
+      "preferredUsername": username,
+      "inbox": `${base}/inbox/${username}`,
+      "outbox": `${base}/outbox/${username}`,
+      "followers": `${base}/user/${username}/followers`,
+      "following": `${base}/user/${username}/following`,
+      "publicKey": {
+        "id": `${base}/user/${username}#main-key`,
+        "owner": `${base}/user/${username}`,
+        "publicKeyPem": "YOUR PUBLIC KEY HERE"
+      }
+    };
+  
+    fs.writeFileSync(path.join(userDir, 'index.json'), JSON.stringify(profile, null, 2));
+    console.log(`🧑‍💻 Created user '${username}'`);
+    res.status(201).json({ status: `User '${username}' created` });
+  });
 
 // Send message
 app.post('/send-message', (req, res) => {
