@@ -24,6 +24,7 @@ app.use('/user', express.static(path.join(__dirname, 'user')));
 app.get('/user/alice', (req, res) => {
   res.sendFile(path.join(__dirname, 'user', 'alice', 'index.json'));
 });
+// ✅ Explicit route for Bob JSON
 app.get('/user/bob', (req, res) => {
   res.sendFile(path.join(__dirname, 'user', 'bob', 'index.json'));
 });
@@ -119,55 +120,46 @@ app.get('/.well-known/webfinger', (req, res) => {
 });
 
 app.post('/send-message', (req, res) => {
-  const { sender, recipient, content } = req.body;
-  const base = 'https://grassrootsactivitypub2.onrender.com';
-
-  if (!sender || !recipient || !content) {
-    return res.status(400).json({ error: 'Missing sender, recipient, or content' });
-  }
-
-  let recipientInbox = `${base}/inbox/${recipient.toLowerCase()}`;
-  const actor = `${base}/user/${sender.toLowerCase()}`;
-
-  const activity = {
-    "@context": "https://www.w3.org/ns/activitystreams",
-    "type": "Create",
-    "actor": actor,
-    "object": {
-      "type": "Note",
-      "content": content,
-      "to": [`${base}/user/${recipient.toLowerCase()}`]
+    console.log('✅ /send-message received a request');
+  
+    const { sender, recipient, content } = req.body;
+    const base = 'https://grassrootsactivitypub2.onrender.com';
+  
+    if (!sender || !recipient || !content) {
+      return res.status(400).json({ error: 'Missing sender, recipient, or content' });
     }
-  };
-
-  const outboxDir = path.join(__dirname, 'outbox', sender.toLowerCase());
-  if (!fs.existsSync(outboxDir)) fs.mkdirSync(outboxDir, { recursive: true });
-  fs.writeFileSync(path.join(outboxDir, `${Date.now()}.json`), JSON.stringify(activity, null, 2));
-
-  if (sender.toLowerCase() === 'alice') {
-    activities.alice.push(activity);
-  } else if (sender.toLowerCase() === 'bob') {
-    activities.bob.push(activity);
-  }
-
-  fetch(recipientInbox, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(activity),
-    agent: new https.Agent({ rejectUnauthorized: false })
-  })
-    .then(response => {
-      if (response.ok) {
-        res.status(200).json({ status: 'Message sent successfully' });
-      } else {
-        res.status(response.status).json({ error: 'Failed to send message' });
+  
+    const actor = `${base}/user/${sender.toLowerCase()}`;
+    const activity = {
+      "@context": "https://www.w3.org/ns/activitystreams",
+      "type": "Create",
+      "actor": actor,
+      "object": {
+        "type": "Note",
+        "content": content,
+        "to": [`${base}/user/${recipient.toLowerCase()}`]
       }
-    })
-    .catch(error => {
-      console.error('Error sending message:', error);
-      res.status(500).json({ error: 'Internal server error' });
-    });
-});
+    };
+  
+    // Save to outbox
+    const outboxDir = path.join(__dirname, 'outbox', sender.toLowerCase());
+    if (!fs.existsSync(outboxDir)) fs.mkdirSync(outboxDir, { recursive: true });
+    fs.writeFileSync(path.join(outboxDir, `${Date.now()}.json`), JSON.stringify(activity, null, 2));
+  
+    if (sender.toLowerCase() === 'alice') {
+      activities.alice.push(activity);
+    } else if (sender.toLowerCase() === 'bob') {
+      activities.bob.push(activity);
+    }
+  
+    // 🚫 No external fetch — write directly to inbox
+    const inboxDir = path.join(__dirname, 'inbox', recipient.toLowerCase());
+    if (!fs.existsSync(inboxDir)) fs.mkdirSync(inboxDir, { recursive: true });
+    fs.writeFileSync(path.join(inboxDir, `${Date.now()}.json`), JSON.stringify(activity, null, 2));
+    console.log(`📥 Message saved to ${recipient}'s inbox`);
+  
+    res.status(200).json({ status: 'Message sent successfully' });
+  });
 
 app.get('/user/alice/following', (req, res) => {
   res.json({
