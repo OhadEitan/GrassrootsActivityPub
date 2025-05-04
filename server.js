@@ -31,7 +31,7 @@ app.get('/user/:username', (req, res) => {
       res.status(404).json({ error: 'User not found' });
     }
   });
-  
+
 const followers = { alice: [], bob: [] };
 const activities = { alice: [], bob: [] };
 
@@ -151,6 +151,40 @@ app.post('/create-user/:username', (req, res) => {
     console.log(`🧑‍💻 Created user '${username}'`);
     res.status(201).json({ status: `User '${username}' created` });
   });
+
+app.get('/inbox/:username', (req, res) => {
+    const username = req.params.username.toLowerCase();
+    const inboxDir = path.join(__dirname, 'inbox', username);
+
+    if (!fs.existsSync(inboxDir)) {
+        return res.status(404).json({ error: `Inbox for user '${username}' not found.` });
+    }
+
+    const files = fs.readdirSync(inboxDir).sort();
+    const messages = files.map(filename => {
+        const content = fs.readFileSync(path.join(inboxDir, filename));
+        return JSON.parse(content);
+    });
+
+    res.json(messages);
+    });
+
+app.get('/outbox/:username', (req, res) => {
+        const username = req.params.username.toLowerCase();
+        const outboxDir = path.join(__dirname, 'outbox', username);
+      
+        if (!fs.existsSync(outboxDir)) {
+          return res.status(404).json({ error: `Outbox for user '${username}' not found.` });
+        }
+      
+        const files = fs.readdirSync(outboxDir).sort();
+        const messages = files.map(filename => {
+          const content = fs.readFileSync(path.join(outboxDir, filename));
+          return JSON.parse(content);
+        });
+      
+        res.json(messages);
+      });
 
 // Send message
 app.post('/send-message', (req, res) => {
