@@ -212,6 +212,6 @@ app.get('/', (req, res) => {
   res.send('Welcome to Grassroots ActivityPub server!');
 });
 
-httpServer.listen(port, () => {
-  console.log(`HTTP Server running on port ${port}`);
-});
+app.listen(port, () => {
+    console.log(`✅ Express server running on port ${port}`);
+  });
