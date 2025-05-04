@@ -250,7 +250,18 @@ app.post('/send-message', async (req, res) => {
       keyId,
       headers: { recipient, date, digest }
     });
-  
+    console.log('📦 Signature Header:', signatureHeader);
+    const headers = {
+        'Host': 'grassrootsactivitypub2.onrender.com',
+        'Date': date,
+        'Digest': digest,
+        'Content-Type': 'application/json',
+        'Signature': signatureHeader
+      };
+      
+    console.log('🧾 Full headers being sent to inbox:');
+    console.log(headers);
+
     try {
       const response = await fetch(inboxUrl, {
         method: 'POST',
