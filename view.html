@@ -24,24 +24,28 @@
       const inboxUrl = `/inbox/${username}`;
       const inboxDiv = document.getElementById("inbox");
       inboxDiv.innerHTML = "Loading...";
-
+  
       try {
         const response = await fetch(inboxUrl);
         const messages = await response.json();
-
+  
         if (response.ok) {
           if (messages.length === 0) {
             inboxDiv.innerHTML = `<p>📭 Inbox is empty for <b>${username}</b></p>`;
             return;
           }
-
-          const html = messages.map((msg, i) => `
-            <div style="border:1px solid #ccc; padding:10px; margin:10px 0;">
-              <b>Message ${i + 1}</b><br/>
-              <pre>${JSON.stringify(msg, null, 2)}</pre>
-            </div>
-          `).join("");
-
+  
+          const html = messages.map((msg, i) => {
+            const sender = msg.actor || "unknown sender";
+            const content = msg.object?.content || "no content";
+            return `
+              <div style="border:1px solid #ccc; padding:10px; margin:10px 0;">
+                <b>${i + 1}. From:</b> ${sender}<br/>
+                <b>Message:</b> ${content}
+              </div>
+            `;
+          }).join("");
+  
           inboxDiv.innerHTML = `<h3>📬 Inbox for <b>${username}</b></h3>` + html;
         } else {
           inboxDiv.innerHTML = `<p style="color:red;">Error: ${messages.error}</p>`;

@@ -6,6 +6,11 @@ const path = require('path');
 const app = express();
 const port = process.env.PORT || 3000;
 const base = 'https://grassrootsactivitypub2.onrender.com';
+const crypto = require('crypto');
+const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
+
+const privateKey = fs.readFileSync(path.join(__dirname, 'private-key.pem'), 'utf8');
+
 
 app.use(bodyParser.json());
 app.use(express.static(__dirname));
@@ -34,6 +39,24 @@ app.get('/user/:username', (req, res) => {
 
 const followers = { alice: [], bob: [] };
 const activities = { alice: [], bob: [] };
+
+function createHTTPSignature({ privateKey, keyId, headers }) {
+  const signer = crypto.createSign('RSA-SHA256');
+
+  const signatureHeaders = [
+    `(request-target): post /inbox/${headers.recipient}`,
+    `host: grassrootsactivitypub2.onrender.com`,
+    `date: ${headers.date}`,
+    `digest: ${headers.digest}`
+  ].join('\n');
+
+  signer.update(signatureHeaders);
+  signer.end();
+
+  const signature = signer.sign(privateKey, 'base64');
+
+  return `keyId="${keyId}",algorithm="rsa-sha256",headers="(request-target) host date digest",signature="${signature}"`;
+}
 
 // Inbox endpoints
 app.post('/inbox/alice', (req, res) => {
@@ -187,45 +210,72 @@ app.get('/outbox/:username', (req, res) => {
       });
 
 // Send message
-app.post('/send-message', (req, res) => {
-  console.log('✅ /send-message endpoint hit');
-  const { sender, recipient, content } = req.body;
-
-  if (!sender || !recipient || !content) {
-    console.log('❌ Missing fields in message');
-    return res.status(400).json({ error: 'Missing sender, recipient, or content' });
-  }
-
-  const activity = {
-    "@context": "https://www.w3.org/ns/activitystreams",
-    "type": "Create",
-    "actor": `${base}/user/${sender.toLowerCase()}`,
-    "object": {
-      "type": "Note",
-      "content": content,
-      "to": [`${base}/user/${recipient.toLowerCase()}`]
+app.post('/send-message', async (req, res) => {
+    console.log('✅ /send-message endpoint hit');
+    const { sender, recipient, content } = req.body;
+  
+    if (!sender || !recipient || !content) {
+      console.log('❌ Missing fields in message');
+      return res.status(400).json({ error: 'Missing sender, recipient, or content' });
     }
-  };
-
-  // Save to sender's outbox
-  const outboxDir = path.join(__dirname, 'outbox', sender.toLowerCase());
-  if (!fs.existsSync(outboxDir)) fs.mkdirSync(outboxDir, { recursive: true });
-  fs.writeFileSync(path.join(outboxDir, `${Date.now()}.json`), JSON.stringify(activity, null, 2));
-
-  if (sender.toLowerCase() === 'alice') {
-    activities.alice.push(activity);
-  } else if (sender.toLowerCase() === 'bob') {
-    activities.bob.push(activity);
-  }
-
-  // Save to recipient's inbox (no fetch!)
-  const inboxDir = path.join(__dirname, 'inbox', recipient.toLowerCase());
-  if (!fs.existsSync(inboxDir)) fs.mkdirSync(inboxDir, { recursive: true });
-  fs.writeFileSync(path.join(inboxDir, `${Date.now()}.json`), JSON.stringify(activity, null, 2));
-
-  console.log(`📬 Message from ${sender} to ${recipient} saved`);
-  res.status(200).json({ status: 'Message sent successfully' });
-});
+  
+    const activity = {
+      "@context": "https://www.w3.org/ns/activitystreams",
+      "type": "Create",
+      "actor": `${base}/user/${sender.toLowerCase()}`,
+      "object": {
+        "type": "Note",
+        "content": content,
+        "to": [`${base}/user/${recipient.toLowerCase()}`]
+      }
+    };
+  
+    // Save to sender's outbox
+    const outboxDir = path.join(__dirname, 'outbox', sender.toLowerCase());
+    if (!fs.existsSync(outboxDir)) fs.mkdirSync(outboxDir, { recursive: true });
+    fs.writeFileSync(path.join(outboxDir, `${Date.now()}.json`), JSON.stringify(activity, null, 2));
+  
+    if (sender.toLowerCase() === 'alice') activities.alice.push(activity);
+    if (sender.toLowerCase() === 'bob') activities.bob.push(activity);
+  
+    // Prepare HTTP Signature headers
+    const inboxPath = `/inbox/${recipient.toLowerCase()}`;
+    const inboxUrl = `${base}${inboxPath}`;
+    const date = new Date().toUTCString();
+    const digest = `SHA-256=${crypto.createHash('sha256').update(JSON.stringify(activity)).digest('base64')}`;
+    const keyId = `${base}/user/${sender.toLowerCase()}#main-key`;
+  
+    const signatureHeader = createHTTPSignature({
+      privateKey,
+      keyId,
+      headers: { recipient, date, digest }
+    });
+  
+    try {
+      const response = await fetch(inboxUrl, {
+        method: 'POST',
+        headers: {
+          'Host': 'grassrootsactivitypub2.onrender.com',
+          'Date': date,
+          'Digest': digest,
+          'Content-Type': 'application/json',
+          'Signature': signatureHeader
+        },
+        body: JSON.stringify(activity)
+      });
+  
+      if (response.ok) {
+        console.log(`📬 Message from ${sender} to ${recipient} sent and signed`);
+        res.status(200).json({ status: 'Message sent and signed successfully' });
+      } else {
+        console.error(`❌ Failed to deliver message: HTTP ${response.status}`);
+        res.status(response.status).json({ error: 'Failed to deliver message' });
+      }
+    } catch (err) {
+      console.error('🚨 Signature delivery error:', err);
+      res.status(500).json({ error: 'Failed to send signed message' });
+    }
+  });
 
 // Follow
 app.post('/follow', (req, res) => {
