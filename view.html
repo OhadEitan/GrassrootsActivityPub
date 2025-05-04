@@ -1,0 +1,55 @@
+<!-- view.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Inbox Viewer</title>
+</head>
+<body>
+  <h2>View User Inbox</h2>
+
+  <form id="viewForm">
+    <label for="username">Enter username:</label>
+    <input type="text" id="username" required />
+    <button type="submit">View Inbox</button>
+  </form>
+
+  <div id="inbox"></div>
+
+  <script>
+    document.getElementById("viewForm").addEventListener("submit", async function (e) {
+      e.preventDefault();
+      const username = document.getElementById("username").value.trim().toLowerCase();
+      const inboxUrl = `/inbox/${username}`;
+      const inboxDiv = document.getElementById("inbox");
+      inboxDiv.innerHTML = "Loading...";
+
+      try {
+        const response = await fetch(inboxUrl);
+        const messages = await response.json();
+
+        if (response.ok) {
+          if (messages.length === 0) {
+            inboxDiv.innerHTML = `<p>📭 Inbox is empty for <b>${username}</b></p>`;
+            return;
+          }
+
+          const html = messages.map((msg, i) => `
+            <div style="border:1px solid #ccc; padding:10px; margin:10px 0;">
+              <b>Message ${i + 1}</b><br/>
+              <pre>${JSON.stringify(msg, null, 2)}</pre>
+            </div>
+          `).join("");
+
+          inboxDiv.innerHTML = `<h3>📬 Inbox for <b>${username}</b></h3>` + html;
+        } else {
+          inboxDiv.innerHTML = `<p style="color:red;">Error: ${messages.error}</p>`;
+        }
+      } catch (err) {
+        inboxDiv.innerHTML = `<p style="color:red;">Failed to load inbox</p>`;
+      }
+    });
+  </script>
+</body>
+</html>
