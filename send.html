@@ -1,0 +1,43 @@
+<!-- send.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Send ActivityPub Message</title>
+</head>
+<body>
+  <h2>Send a Message</h2>
+  <form id="sendForm">
+    <label for="sender">Sender:</label>
+    <input type="text" id="sender" name="sender" value="Alice" required><br><br>
+
+    <label for="recipient">Recipient:</label>
+    <input type="text" id="recipient" name="recipient" value="Bob" required><br><br>
+
+    <label for="content">Message:</label><br>
+    <textarea id="content" name="content" rows="4" cols="50" required>Hello from the browser!</textarea><br><br>
+
+    <button type="submit">Send</button>
+  </form>
+
+  <p id="result"></p>
+
+  <script>
+    document.getElementById('sendForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const sender = document.getElementById('sender').value;
+      const recipient = document.getElementById('recipient').value;
+      const content = document.getElementById('content').value;
+
+      const response = await fetch('/send-message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sender, recipient, content })
+      });
+
+      const result = await response.json();
+      document.getElementById('result').textContent = JSON.stringify(result);
+    });
+  </script>
+</body>
+</html>

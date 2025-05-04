@@ -8,6 +8,7 @@ const port = process.env.PORT || 3000;
 const base = 'https://grassrootsactivitypub2.onrender.com';
 
 app.use(bodyParser.json());
+app.use(express.static(__dirname));
 
 // Serve static profiles
 app.use('/user', express.static(path.join(__dirname, 'user')));
