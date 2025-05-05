@@ -203,6 +203,9 @@ app.post('/send-message', async (req, res) => {
   }
 
   const recipientPublicKey = fs.readFileSync(recipientKeyPath, 'utf8');
+
+  console.log(`🔐 Public key used for encryption (${recipient}):\n${recipientPublicKey}`);
+  console.log(`✉️ Message to encrypt: "${content}"`);
   const encryptedMessage = encryptMessage(recipientPublicKey, content);
 
   const inboxUrl = `${base}/inbox/${recipient.toLowerCase()}`;
@@ -220,7 +223,7 @@ app.post('/send-message', async (req, res) => {
     keyId,
     headers: { recipient, date, digest }
   });
-  
+
   const headers = {
     'Host': 'grassrootsactivitypub2.onrender.com',
     'Date': date,
