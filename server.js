@@ -209,8 +209,18 @@ app.post('/send-message', async (req, res) => {
   const date = new Date().toUTCString();
   const digest = `SHA-256=${crypto.createHash('sha256').update(JSON.stringify(activity)).digest('base64')}`;
   const keyId = `${base}/user/${sender.toLowerCase()}#main-key`;
-  const signatureHeader = createHTTPSignature({ privateKey, keyId, headers: { recipient, date, digest } });
-
+  const senderPrivKeyPath = path.join(__dirname, 'user', sender.toLowerCase(), 'private-key.pem');
+  if (!fs.existsSync(senderPrivKeyPath)) {
+    return res.status(404).json({ error: `Private key for ${sender} not found` });
+  }
+  const senderPrivateKey = fs.readFileSync(senderPrivKeyPath, 'utf8');
+  
+  const signatureHeader = createHTTPSignature({
+    privateKey: senderPrivateKey,
+    keyId,
+    headers: { recipient, date, digest }
+  });
+  
   const headers = {
     'Host': 'grassrootsactivitypub2.onrender.com',
     'Date': date,
