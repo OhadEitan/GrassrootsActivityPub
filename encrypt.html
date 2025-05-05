@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Test Public Key Encryption</title>
+  <style>
+    body { font-family: Arial; margin: 2em; }
+    textarea, input { width: 100%; margin-top: 0.5em; }
+    button { margin-top: 1em; padding: 0.5em 1em; }
+    pre { background: #f4f4f4; padding: 1em; margin-top: 1em; white-space: pre-wrap; word-break: break-word; }
+  </style>
+</head>
+<body>
+  <h1>🔐 Public Key Encryptor</h1>
+
+  <label for="publicKey">Public Key (PEM format)</label>
+  <textarea id="publicKey" rows="10" placeholder="-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----"></textarea>
+
+  <label for="message">Message to Encrypt</label>
+  <textarea id="message" rows="4" placeholder="Hello, this is a test!"></textarea>
+
+  <button onclick="encrypt()">Encrypt</button>
+
+  <h2>🔒 Encrypted Output (Base64)</h2>
+  <pre id="output"></pre>
+
+  <script>
+    async function encrypt() {
+      const publicKeyPem = document.getElementById('publicKey').value.trim();
+      const message = document.getElementById('message').value;
+
+      if (!publicKeyPem || !message) {
+        alert("Please provide both a public key and a message.");
+        return;
+      }
+
+      try {
+        // Import the public key into a CryptoKey object
+        const publicKey = await window.crypto.subtle.importKey(
+          "spki",
+          pemToArrayBuffer(publicKeyPem),
+          {
+            name: "RSA-OAEP",
+            hash: "SHA-256"
+          },
+          false,
+          ["encrypt"]
+        );
+
+        // Encrypt the message
+        const encryptedBuffer = await window.crypto.subtle.encrypt(
+          { name: "RSA-OAEP" },
+          publicKey,
+          new TextEncoder().encode(message)
+        );
+
+        const encryptedBase64 = arrayBufferToBase64(encryptedBuffer);
+        document.getElementById('output').textContent = encryptedBase64;
+      } catch (err) {
+        document.getElementById('output').textContent = "❌ Error: " + err.message;
+        console.error(err);
+      }
+    }
+
+    function pemToArrayBuffer(pem) {
+      const b64 = pem.replace(/-----.*?-----/g, '').replace(/\s+/g, '');
+      const binary = atob(b64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      return bytes.buffer;
+    }
+
+    function arrayBufferToBase64(buffer) {
+      const bytes = new Uint8Array(buffer);
+      let binary = '';
+      bytes.forEach(b => binary += String.fromCharCode(b));
+      return btoa(binary);
+    }
+  </script>
+</body>
+</html>
