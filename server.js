@@ -205,10 +205,31 @@ app.post('/create-user/:username', (req, res) => {
       return res.status(400).json({ error: `User '${username}' already exists.` });
     }
   
+    // Create directories
     fs.mkdirSync(userDir, { recursive: true });
     fs.mkdirSync(inboxDir, { recursive: true });
     fs.mkdirSync(outboxDir, { recursive: true });
   
+    // 🔐 Generate RSA key pair
+    const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', {
+      modulusLength: 2048,
+      publicKeyEncoding: {
+        type: 'spki',
+        format: 'pem'
+      },
+      privateKeyEncoding: {
+        type: 'pkcs8',
+        format: 'pem'
+      }
+    });
+  
+    // Save keys to disk
+    const pubKeyPath = path.join(userDir, 'public-key.pem');
+    const privKeyPath = path.join(userDir, 'private-key.pem');
+    fs.writeFileSync(pubKeyPath, publicKey);
+    fs.writeFileSync(privKeyPath, privateKey);
+  
+    // Create ActivityPub profile
     const profile = {
       "@context": "https://www.w3.org/ns/activitystreams",
       "id": `${base}/user/${username}`,
@@ -221,15 +242,17 @@ app.post('/create-user/:username', (req, res) => {
       "publicKey": {
         "id": `${base}/user/${username}#main-key`,
         "owner": `${base}/user/${username}`,
-        "publicKeyPem": "YOUR PUBLIC KEY HERE"
+        "publicKeyPem": publicKey
       }
     };
   
+    // Save profile to index.json
     fs.writeFileSync(path.join(userDir, 'index.json'), JSON.stringify(profile, null, 2));
-    console.log(`🧑‍💻 Created user '${username}'`);
-    res.status(201).json({ status: `User '${username}' created` });
+  
+    console.log(`🧑‍💻 Created user '${username}' with key pair`);
+    res.status(201).json({ status: `User '${username}' created successfully` });
   });
-
+  
 app.get('/inbox/:username', (req, res) => {
     const username = req.params.username.toLowerCase();
     const inboxDir = path.join(__dirname, 'inbox', username);
