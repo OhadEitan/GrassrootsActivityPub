@@ -3,7 +3,7 @@ const bodyParser = require('body-parser');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const bcrypt = require('bcrypt'); // Add this at the top of your file
+const bcrypt = require('bcrypt');
 
 const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 
@@ -18,6 +18,15 @@ app.use('/user', express.static(path.join(__dirname, 'user')));
 
 const followers = {};
 const activities = {};
+
+async function authenticateUser(username, password) {
+  const passPath = path.join(__dirname, 'user', username, 'password.txt');
+  if (!fs.existsSync(passPath)) return false;
+
+  const hashed = fs.readFileSync(passPath, 'utf8');
+  return await bcrypt.compare(password, hashed);
+}
+
 
 function createHTTPSignature({ privateKey, keyId, headers }) {
   const signer = crypto.createSign('RSA-SHA256');
@@ -77,13 +86,6 @@ app.get('/user/:username', (req, res) => {
   }
 });
 
-async function authenticateUser(username, password) {
-  const passPath = path.join(__dirname, 'user', username, 'password.txt');
-  if (!fs.existsSync(passPath)) return false;
-
-  const hashed = fs.readFileSync(passPath, 'utf8');
-  return await bcrypt.compare(password, hashed);
-}
 
 
 app.post('/create-user/:username', async (req, res) => {
