@@ -28,14 +28,19 @@
     document.getElementById('userInfo').textContent = `Logged in as: ${username}`;
 
     async function fetchData(endpoint) {
-      let url = `/${endpoint}/${username}`;
-      if (endpoint === 'followers' || endpoint === 'following') {
+    const username = sessionStorage.getItem('username');
+    const token = sessionStorage.getItem('token');
+    let url = `/${endpoint}/${username}`;
+    if (endpoint === 'followers' || endpoint === 'following') {
         url = `/user/${username}/${endpoint}`;
-      }
+    }
 
-      const res = await fetch(`${url}?password=${encodeURIComponent(password)}`);
-      const data = await res.json();
-      document.getElementById('output').textContent = JSON.stringify(data, null, 2);
+    const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` }
+    });
+
+    const data = await res.json();
+    document.getElementById('output').textContent = JSON.stringify(data, null, 2);
     }
 
     function logout() {

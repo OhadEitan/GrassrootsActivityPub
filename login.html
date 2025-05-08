@@ -34,6 +34,23 @@
 
       // Optionally redirect to dashboard
       window.location.href = '/dashboard.html';
+
+      const response = await fetch('/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      console.log('Authenticating', { username, password, hashed });
+
+      const data = await response.json();
+        if (data.token) {
+          sessionStorage.setItem('token', data.token);
+          sessionStorage.setItem('username', username);
+          window.location.href = '/dashboard.html';
+        }
+        else {
+            document.getElementById('loginResult').textContent = data.error || "Login failed.";
+        }
     });
   </script>
 </body>

@@ -16,8 +16,11 @@ const base = 'https://grassrootsactivitypub2.onrender.com';
 async function authenticateUser(username, password) {
   const passPath = path.join(__dirname, 'user', username, 'password.txt');
   if (!fs.existsSync(passPath)) return false;
+  if (!password) return false; // <-- Add this check
 
   const hashed = fs.readFileSync(passPath, 'utf8');
+  if (!hashed) return false;  // <-- Optional sanity check
+
   return await bcrypt.compare(password, hashed);
 }
 
@@ -30,6 +33,19 @@ const followers = {};
 const activities = {};
 
 
+function verifyToken(req, res, next) {
+  const auth = req.headers.authorization;
+  if (!auth?.startsWith('Bearer ')) return res.status(401).json({ error: 'Missing token' });
+
+  const token = auth.split(' ')[1];
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch (err) {
+    res.status(401).json({ error: 'Invalid token' });
+  }
+}
 
 
 function createHTTPSignature({ privateKey, keyId, headers }) {
@@ -163,8 +179,10 @@ app.post('/create-user/:username', async (req, res) => {
   res.status(201).json({ status: `User '${username}' created successfully` });
 });
 
-app.get('/inbox/:username', async (req, res) => {
-    const username = req.params.username.toLowerCase();
+app.get('/inbox/:username', verifyToken, (req, res) => {
+  const username = req.params.username.toLowerCase();
+  if (req.user.username !== username) return res.status(403).json({ error: 'Forbidden' });
+
   const inboxDir = path.join(__dirname, 'inbox', username);
 
   const { password } = req.query;
