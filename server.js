@@ -4,6 +4,8 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-key';
 
 const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 
@@ -77,6 +79,17 @@ function decryptMessage(privateKeyPem, encryptedMessage) {
   );
   return decrypted.toString('utf8');
 }
+
+app.post('/login', async (req, res) => {
+  const { username, password } = req.body;
+
+  if (!await authenticateUser(username, password)) {
+    return res.status(401).json({ error: 'Invalid credentials' });
+  }
+
+  const token = jwt.sign({ username }, JWT_SECRET, { expiresIn: '2h' });
+  res.json({ token });
+});
 
 app.get('/user/:username', (req, res) => {
   const profilePath = path.join(__dirname, 'user', req.params.username.toLowerCase(), 'index.json');
