@@ -3,6 +3,8 @@ const bodyParser = require('body-parser');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const bcrypt = require('bcrypt'); // Add this at the top of your file
+
 const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 
 const app = express();
@@ -25,6 +27,8 @@ function createHTTPSignature({ privateKey, keyId, headers }) {
     `date: ${headers.date}`,
     `digest: ${headers.digest}`
   ].join('\n');
+  console.log(`Headers to be signed:\n${signatureHeaders}\n`);
+
 
   signer.update(signatureHeaders);
   signer.end();
@@ -32,7 +36,11 @@ function createHTTPSignature({ privateKey, keyId, headers }) {
   const signature = signer.sign(privateKey, 'base64');
 
   return `keyId="${keyId}",algorithm="rsa-sha256",headers="(request-target) host date digest",signature="${signature}"`;
+  console.log(`🔏 Final Signature Header:\n${signatureHeader}\n`);
+
 }
+console.log(`🔏 Signature Header:\n${signatureHeader}`);
+
 
 function encryptMessage(publicKeyPem, message) {
   const bufferMessage = Buffer.from(message, 'utf8');
@@ -69,10 +77,21 @@ app.get('/user/:username', (req, res) => {
   }
 });
 
+async function authenticateUser(username, password) {
+  const passPath = path.join(__dirname, 'user', username, 'password.txt');
+  if (!fs.existsSync(passPath)) return false;
+
+  const hashed = fs.readFileSync(passPath, 'utf8');
+  return await bcrypt.compare(password, hashed);
+}
 
 
 app.post('/create-user/:username', (req, res) => {
   const username = req.params.username.toLowerCase();
+  const password = req.body.password;
+  if (!password || password.length < 4) {
+    return res.status(400).json({ error: 'Password must be at least 4 characters' });
+  }
   const userDir = path.join(__dirname, 'user', username);
   const inboxDir = path.join(__dirname, 'inbox', username);
   const outboxDir = path.join(__dirname, 'outbox', username);
@@ -85,6 +104,9 @@ app.post('/create-user/:username', (req, res) => {
   fs.mkdirSync(userDir, { recursive: true });
   fs.mkdirSync(inboxDir, { recursive: true });
   fs.mkdirSync(outboxDir, { recursive: true });
+
+  const hashedPassword = await bcrypt.hash(password, 10);
+  fs.writeFileSync(path.join(userDir, 'password.txt'), hashedPassword);
 
   const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', {
     modulusLength: 2048,
@@ -129,6 +151,12 @@ app.get('/inbox/:username', (req, res) => {
   const username = req.params.username.toLowerCase();
   const inboxDir = path.join(__dirname, 'inbox', username);
 
+  const { password } = req.query;
+
+  if (!await authenticateUser(username, password)) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
   if (!fs.existsSync(inboxDir)) {
     return res.status(404).json({ error: `Inbox for user '${username}' not found.` });
   }
@@ -153,6 +181,13 @@ app.post('/inbox/:username', (req, res) => {
 
 app.get('/outbox/:username', (req, res) => {
   const username = req.params.username.toLowerCase();
+
+  const { password } = req.query;
+
+  if (!await authenticateUser(username, password)) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
   const outboxDir = path.join(__dirname, 'outbox', username);
 
   if (!fs.existsSync(outboxDir)) {
@@ -170,6 +205,13 @@ app.get('/outbox/:username', (req, res) => {
 
 app.get('/user/:username/followers', (req, res) => {
   const username = req.params.username.toLowerCase();
+
+  const { password } = req.query;
+
+  if (!await authenticateUser(username, password)) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
   res.json({
     "@context": "https://www.w3.org/ns/activitystreams",
     "id": `${base}/user/${username}/followers`,
@@ -181,6 +223,13 @@ app.get('/user/:username/followers', (req, res) => {
 
 app.get('/user/:username/following', (req, res) => {
   const username = req.params.username.toLowerCase();
+
+  const { password } = req.query;
+
+  if (!await authenticateUser(username, password)) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
   res.json({
     "@context": "https://www.w3.org/ns/activitystreams",
     "id": `${base}/user/${username}/following`,
@@ -280,6 +329,13 @@ app.post('/send-message', async (req, res) => {
 
 app.get('/decrypt/:username', (req, res) => {
   const username = req.params.username.toLowerCase();
+
+  const { password } = req.query;
+
+  if (!await authenticateUser(username, password)) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  
   const inboxDir = path.join(__dirname, 'inbox', username);
   const privateKeyPath = path.join(__dirname, 'user', username, 'private-key.pem');
 
