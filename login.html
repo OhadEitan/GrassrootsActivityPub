@@ -19,38 +19,35 @@
   <p id="loginResult"></p>
 
   <script>
-    document.getElementById('loginForm').addEventListener('submit', function (e) {
+    document.getElementById('loginForm').addEventListener('submit', async function (e) {
       e.preventDefault();
       const username = document.getElementById('username').value.trim().toLowerCase();
       const password = document.getElementById('password').value;
-
+  
       if (!username || !password) return;
-
-      // Store for future fetches
-      sessionStorage.setItem('username', username);
-      sessionStorage.setItem('password', password);
-
-      document.getElementById('loginResult').textContent = `Logged in as ${username}`;
-
-      // Optionally redirect to dashboard
-      window.location.href = '/dashboard.html';
-
-      const response = await fetch('/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
-      });
-      console.log('Authenticating', { username, password, hashed });
-
-      const data = await response.json();
+  
+      try {
+        const response = await fetch('/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+  
+        const data = await response.json();
+        console.log('Authenticating', { username, password });
+  
         if (data.token) {
           sessionStorage.setItem('token', data.token);
           sessionStorage.setItem('username', username);
+          sessionStorage.setItem('password', password);
+          document.getElementById('loginResult').textContent = `✅ Logged in as ${username}`;
           window.location.href = '/dashboard.html';
+        } else {
+          document.getElementById('loginResult').textContent = data.error || "❌ Login failed.";
         }
-        else {
-            document.getElementById('loginResult').textContent = data.error || "Login failed.";
-        }
+      } catch (err) {
+        document.getElementById('loginResult').textContent = "⚠️ Network error.";
+      }
     });
   </script>
 </body>
