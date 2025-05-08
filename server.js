@@ -208,6 +208,19 @@ app.post('/send-message', async (req, res) => {
       "to": [`${base}/user/${recipient.toLowerCase()}`]
     }
   };
+ 
+
+  const outboxDir = path.join(__dirname, 'outbox', sender.toLowerCase());
+  if (!fs.existsSync(outboxDir)) fs.mkdirSync(outboxDir, { recursive: true });
+  fs.writeFileSync(path.join(outboxDir, `${Date.now()}.json`), JSON.stringify(activity, null, 2));
+  if (!activities[sender.toLowerCase()]) activities[sender.toLowerCase()] = [];
+  activities[sender.toLowerCase()].push(activity);
+
+  const recipientKeyPath = path.join(__dirname, 'user', recipient.toLowerCase(), 'public-key.pem');
+  if (!fs.existsSync(recipientKeyPath)) {
+    return res.status(404).json({ error: `Public key for ${recipient} not found` });
+  }
+
   const inboxEntry = {
     encryptedMessage,
     from: sender.toLowerCase(),
@@ -230,17 +243,7 @@ app.post('/send-message', async (req, res) => {
     JSON.stringify(outboxEntry, null, 2)
   );
 
-  const outboxDir = path.join(__dirname, 'outbox', sender.toLowerCase());
-  if (!fs.existsSync(outboxDir)) fs.mkdirSync(outboxDir, { recursive: true });
-  fs.writeFileSync(path.join(outboxDir, `${Date.now()}.json`), JSON.stringify(activity, null, 2));
-  if (!activities[sender.toLowerCase()]) activities[sender.toLowerCase()] = [];
-  activities[sender.toLowerCase()].push(activity);
-
-  const recipientKeyPath = path.join(__dirname, 'user', recipient.toLowerCase(), 'public-key.pem');
-  if (!fs.existsSync(recipientKeyPath)) {
-    return res.status(404).json({ error: `Public key for ${recipient} not found` });
-  }
-
+  
   const recipientPublicKey = fs.readFileSync(recipientKeyPath, 'utf8');
 
   console.log(`🔐 Public key used for encryption (${recipient}):\n${recipientPublicKey}`);
