@@ -86,7 +86,7 @@ async function authenticateUser(username, password) {
 }
 
 
-app.post('/create-user/:username', (req, res) => {
+app.post('/create-user/:username', async (req, res) => {
   const username = req.params.username.toLowerCase();
   const password = req.body.password;
   if (!password || password.length < 4) {
@@ -335,7 +335,7 @@ app.get('/decrypt/:username', (req, res) => {
   if (!await authenticateUser(username, password)) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
-  
+
   const inboxDir = path.join(__dirname, 'inbox', username);
   const privateKeyPath = path.join(__dirname, 'user', username, 'private-key.pem');
 
