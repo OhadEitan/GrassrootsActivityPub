@@ -69,11 +69,34 @@ app.get('/user/:username', (req, res) => {
   }
 });
 
+const inboxEntry = {
+  encryptedMessage,
+  from: sender.toLowerCase(),
+  to: recipient.toLowerCase(),
+  receivedAt: new Date().toISOString()
+};
+
+const outboxEntry = {
+  activity,
+  sentAt: new Date().toISOString()
+};
+
+fs.writeFileSync(
+  path.join(inboxDir, `${Date.now()}.json`),
+  JSON.stringify(inboxEntry, null, 2)
+);
+
+fs.writeFileSync(
+  path.join(outboxDir, `${Date.now()}.json`),
+  JSON.stringify(outboxEntry, null, 2)
+);
+
 app.post('/create-user/:username', (req, res) => {
   const username = req.params.username.toLowerCase();
   const userDir = path.join(__dirname, 'user', username);
-  const inboxDir = path.join(__dirname, 'inbox', username);
-  const outboxDir = path.join(__dirname, 'outbox', username);
+  fs.writeFileSync(path.join(outboxDir, `${Date.now()}.json`), JSON.stringify(outboxEntry, null, 2));
+  fs.writeFileSync(path.join(inboxDir, `${Date.now()}.json`), JSON.stringify(inboxEntry, null, 2));
+
 
   if (fs.existsSync(userDir)) {
     return res.status(400).json({ error: `User '${username}' already exists.` });
@@ -198,6 +221,7 @@ app.post('/send-message', async (req, res) => {
     "@context": "https://www.w3.org/ns/activitystreams",
     "type": "Create",
     "actor": `${base}/user/${sender.toLowerCase()}`,
+    "published": new Date().toISOString(),
     "object": {
       "type": "Note",
       "content": content,
@@ -258,7 +282,11 @@ app.post('/send-message', async (req, res) => {
     fs.writeFileSync(path.join(inboxDir, `${Date.now()}.json`), JSON.stringify({ encryptedMessage }, null, 2));
 
     if (response.ok) {
-      res.status(200).json({ status: 'Message sent and encrypted successfully' });
+      res.status(200).json({
+        status: 'Message sent and encrypted successfully',
+        sentAt: new Date().toISOString(),
+        plaintext: content
+      });
     } else {
       const errorText = await response.text();
       res.status(response.status).json({ error: 'Failed to deliver message', details: errorText });
