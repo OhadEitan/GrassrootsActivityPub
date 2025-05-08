@@ -76,9 +76,6 @@ app.post('/create-user/:username', (req, res) => {
   const userDir = path.join(__dirname, 'user', username);
   const inboxDir = path.join(__dirname, 'inbox', username);
   const outboxDir = path.join(__dirname, 'outbox', username);
-  
-  fs.writeFileSync(path.join(outboxDir, `${Date.now()}.json`), JSON.stringify(outboxEntry, null, 2));
-  fs.writeFileSync(path.join(inboxDir, `${Date.now()}.json`), JSON.stringify(inboxEntry, null, 2));
 
 
   if (fs.existsSync(userDir)) {
