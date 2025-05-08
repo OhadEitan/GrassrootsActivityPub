@@ -69,27 +69,7 @@ app.get('/user/:username', (req, res) => {
   }
 });
 
-const inboxEntry = {
-  encryptedMessage,
-  from: sender.toLowerCase(),
-  to: recipient.toLowerCase(),
-  receivedAt: new Date().toISOString()
-};
 
-const outboxEntry = {
-  activity,
-  sentAt: new Date().toISOString()
-};
-
-fs.writeFileSync(
-  path.join(inboxDir, `${Date.now()}.json`),
-  JSON.stringify(inboxEntry, null, 2)
-);
-
-fs.writeFileSync(
-  path.join(outboxDir, `${Date.now()}.json`),
-  JSON.stringify(outboxEntry, null, 2)
-);
 
 app.post('/create-user/:username', (req, res) => {
   const username = req.params.username.toLowerCase();
@@ -228,6 +208,27 @@ app.post('/send-message', async (req, res) => {
       "to": [`${base}/user/${recipient.toLowerCase()}`]
     }
   };
+  const inboxEntry = {
+    encryptedMessage,
+    from: sender.toLowerCase(),
+    to: recipient.toLowerCase(),
+    receivedAt: new Date().toISOString()
+  };
+  
+  const outboxEntry = {
+    activity,
+    sentAt: new Date().toISOString()
+  };
+  
+  fs.writeFileSync(
+    path.join(inboxDir, `${Date.now()}.json`),
+    JSON.stringify(inboxEntry, null, 2)
+  );
+  
+  fs.writeFileSync(
+    path.join(outboxDir, `${Date.now()}.json`),
+    JSON.stringify(outboxEntry, null, 2)
+  );
 
   const outboxDir = path.join(__dirname, 'outbox', sender.toLowerCase());
   if (!fs.existsSync(outboxDir)) fs.mkdirSync(outboxDir, { recursive: true });
