@@ -47,7 +47,7 @@ function createHTTPSignature({ privateKey, keyId, headers }) {
   const signature = signer.sign(privateKey, 'base64');
 
   return `keyId="${keyId}",algorithm="rsa-sha256",headers="(request-target) host date digest",signature="${signature}"`;
-  console.log(`🔏 Final Signature Header:\n${signatureHeader}\n`);
+  console.log(`🔏 Final Signature: \n${signature}\n`);
 
 }
 console.log(`🔏 Signature Header:\n${signatureHeader}`);
@@ -151,8 +151,8 @@ app.post('/create-user/:username', async (req, res) => {
   res.status(201).json({ status: `User '${username}' created successfully` });
 });
 
-app.get('/inbox/:username', (req, res) => {
-  const username = req.params.username.toLowerCase();
+app.get('/inbox/:username', async (req, res) => {
+    const username = req.params.username.toLowerCase();
   const inboxDir = path.join(__dirname, 'inbox', username);
 
   const { password } = req.query;
@@ -183,7 +183,7 @@ app.post('/inbox/:username', (req, res) => {
   res.status(200).json({ status: `Message saved for ${username}` });
 });
 
-app.get('/outbox/:username', (req, res) => {
+app.get('/outbox/:username', async (req, res) => {
   const username = req.params.username.toLowerCase();
 
   const { password } = req.query;
@@ -207,7 +207,7 @@ app.get('/outbox/:username', (req, res) => {
   res.json(messages);
 });
 
-app.get('/user/:username/followers', (req, res) => {
+app.get('/user/:username/followers', async (req, res) => {
   const username = req.params.username.toLowerCase();
 
   const { password } = req.query;
@@ -225,7 +225,7 @@ app.get('/user/:username/followers', (req, res) => {
   });
 });
 
-app.get('/user/:username/following', (req, res) => {
+app.get('/user/:username/following', async (req, res) => {
   const username = req.params.username.toLowerCase();
 
   const { password } = req.query;
@@ -331,7 +331,7 @@ app.post('/send-message', async (req, res) => {
   }
 });
 
-app.get('/decrypt/:username', (req, res) => {
+app.get('/decrypt/:username', async (req, res) => {
   const username = req.params.username.toLowerCase();
 
   const { password } = req.query;
