@@ -50,7 +50,6 @@ function createHTTPSignature({ privateKey, keyId, headers }) {
   console.log(`🔏 Final Signature: \n${signature}\n`);
 
 }
-console.log(`🔏 Signature Header:\n${signatureHeader}`);
 
 
 function encryptMessage(publicKeyPem, message) {
