@@ -11,6 +11,14 @@ const app = express();
 const port = process.env.PORT || 3000;
 const base = 'https://grassrootsactivitypub2.onrender.com';
 
+async function authenticateUser(username, password) {
+  const passPath = path.join(__dirname, 'user', username, 'password.txt');
+  if (!fs.existsSync(passPath)) return false;
+
+  const hashed = fs.readFileSync(passPath, 'utf8');
+  return await bcrypt.compare(password, hashed);
+}
+
 app.use(bodyParser.json());
 app.use(express.static(__dirname));
 
@@ -19,13 +27,7 @@ app.use('/user', express.static(path.join(__dirname, 'user')));
 const followers = {};
 const activities = {};
 
-async function authenticateUser(username, password) {
-  const passPath = path.join(__dirname, 'user', username, 'password.txt');
-  if (!fs.existsSync(passPath)) return false;
 
-  const hashed = fs.readFileSync(passPath, 'utf8');
-  return await bcrypt.compare(password, hashed);
-}
 
 
 function createHTTPSignature({ privateKey, keyId, headers }) {
