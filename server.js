@@ -63,9 +63,8 @@ function createHTTPSignature({ privateKey, keyId, headers }) {
   signer.end();
 
   const signature = signer.sign(privateKey, 'base64');
-
-  return `keyId="${keyId}",algorithm="rsa-sha256",headers="(request-target) host date digest",signature="${signature}"`;
   console.log(`🔏 Final Signature: \n${signature}\n`);
+  return `keyId="${keyId}",algorithm="rsa-sha256",headers="(request-target) host date digest",signature="${signature}"`;
 
 }
 
@@ -179,17 +178,13 @@ app.post('/create-user/:username', async (req, res) => {
   res.status(201).json({ status: `User '${username}' created successfully` });
 });
 
-app.get('/inbox/:username', verifyToken, (req, res) => {
+app.get('/inbox/:username', verifyToken, async (req, res) => {
   const username = req.params.username.toLowerCase();
   if (req.user.username !== username) return res.status(403).json({ error: 'Forbidden' });
 
   const inboxDir = path.join(__dirname, 'inbox', username);
 
-  const { password } = req.query;
 
-  if (!await authenticateUser(username, password)) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
 
   if (!fs.existsSync(inboxDir)) {
     return res.status(404).json({ error: `Inbox for user '${username}' not found.` });
@@ -213,15 +208,11 @@ app.post('/inbox/:username', (req, res) => {
   res.status(200).json({ status: `Message saved for ${username}` });
 });
 
-app.get('/outbox/:username', async (req, res) => {
+app.get('/outbox/:username', verifyToken, async (req, res) => {
   const username = req.params.username.toLowerCase();
 
-  const { password } = req.query;
-
-  if (!await authenticateUser(username, password)) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
+  if (req.user.username !== username) return res.status(403).json({ error: 'Forbidden' });
+  
   const outboxDir = path.join(__dirname, 'outbox', username);
 
   if (!fs.existsSync(outboxDir)) {
@@ -237,14 +228,9 @@ app.get('/outbox/:username', async (req, res) => {
   res.json(messages);
 });
 
-app.get('/user/:username/followers', async (req, res) => {
+app.get('/user/:username/followers', verifyToken, async (req, res) => {
   const username = req.params.username.toLowerCase();
-
-  const { password } = req.query;
-
-  if (!await authenticateUser(username, password)) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
+  if (req.user.username !== username) return res.status(403).json({ error: 'Forbidden' });
 
   res.json({
     "@context": "https://www.w3.org/ns/activitystreams",
@@ -255,14 +241,9 @@ app.get('/user/:username/followers', async (req, res) => {
   });
 });
 
-app.get('/user/:username/following', async (req, res) => {
+app.get('/user/:username/following', verifyToken, async (req, res) => {
   const username = req.params.username.toLowerCase();
-
-  const { password } = req.query;
-
-  if (!await authenticateUser(username, password)) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
+  if (req.user.username !== username) return res.status(403).json({ error: 'Forbidden' });
 
   res.json({
     "@context": "https://www.w3.org/ns/activitystreams",
@@ -361,14 +342,9 @@ app.post('/send-message', async (req, res) => {
   }
 });
 
-app.get('/decrypt/:username', async (req, res) => {
+app.get('/decrypt/:username', verifyToken, async (req, res) => {
   const username = req.params.username.toLowerCase();
-
-  const { password } = req.query;
-
-  if (!await authenticateUser(username, password)) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
+  if (req.user.username !== username) return res.status(403).json({ error: 'Forbidden' });
 
   const inboxDir = path.join(__dirname, 'inbox', username);
   const privateKeyPath = path.join(__dirname, 'user', username, 'private-key.pem');
