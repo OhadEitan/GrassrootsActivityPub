@@ -24,6 +24,30 @@ async function authenticateUser(username, password) {
   return await bcrypt.compare(password, hashed);
 }
 
+function hybridDecrypt(encryptedKeyB64, encryptedBlockB64, ivB64, privateKeyPem) {
+  const encryptedKey = Buffer.from(encryptedKeyB64, 'base64');
+  const iv = Buffer.from(ivB64, 'base64');
+  const encryptedBlock = Buffer.from(encryptedBlockB64, 'base64');
+
+  const aesKey = crypto.privateDecrypt(
+    {
+      key: privateKeyPem,
+      padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
+      oaepHash: 'sha256'
+    },
+    encryptedKey
+  );
+
+  const decipher = crypto.createDecipheriv('aes-256-cbc', aesKey, iv);
+  let decrypted = decipher.update(encryptedBlock);
+  decrypted = Buffer.concat([decrypted, decipher.final()]);
+
+  const padLen = decrypted[decrypted.length - 1];
+  return JSON.parse(decrypted.slice(0, -padLen).toString());
+}
+
+
+
 app.use(bodyParser.json());
 app.use(express.static(__dirname));
 
@@ -255,28 +279,31 @@ app.get('/user/:username/following', verifyToken, async (req, res) => {
 });
 
 app.post('/send-message', async (req, res) => {
-  const { sender, recipient, content, block } = req.body;
+  const { sender, recipient, content, block, encrypted_block, encrypted_key, iv } = req.body;
 
-  if (!sender || !recipient || (!content && !block)) {
-    return res.status(400).json({ error: 'Missing sender, recipient, or content/block' });
+  if (!sender || !recipient) {
+    return res.status(400).json({ error: 'Missing sender or recipient' });
   }
 
-  // Determine what to use for the message
-  const messageObject = block || content;
-  const isObjectContent = typeof messageObject === 'object' && messageObject !== null;
+  const isHybrid = encrypted_block && encrypted_key && iv;
 
-  const activity = {
-  "@context": "https://www.w3.org/ns/activitystreams",
-  "type": "Create",
-  "actor": `${base}/user/${sender.toLowerCase()}`,
-  "published": new Date().toISOString(),
-  "object": {
-    "type": "Note",
-    "content": isObjectContent ? JSON.stringify(messageObject) : messageObject,
-    "to": [`${base}/user/${recipient.toLowerCase()}`]
+  let decryptedBlock;
+  if (isHybrid) {
+    try {
+      const recipientPrivateKey = fs.readFileSync(path.join(__dirname, 'user', recipient.toLowerCase(), 'private-key.pem'), 'utf8');
+
+      decryptedBlock = hybridDecrypt(encrypted_key, encrypted_block, iv, recipientPrivateKey);
+      console.log("🔓 Decrypted hybrid block:", decryptedBlock);
+    } catch (err) {
+      console.error("❌ Hybrid decryption failed:", err.message);
+      return res.status(400).json({ error: 'Hybrid decryption failed', details: err.message });
+    }
+  } else if (content || block) {
+    decryptedBlock = content || block;
+  } else {
+    return res.status(400).json({ error: 'Missing message payload' });
   }
-  };
- 
+  
 
   const outboxDir = path.join(__dirname, 'outbox', sender.toLowerCase());
   if (!fs.existsSync(outboxDir)) fs.mkdirSync(outboxDir, { recursive: true });
@@ -293,7 +320,7 @@ app.post('/send-message', async (req, res) => {
   const recipientPublicKey = fs.readFileSync(recipientKeyPath, 'utf8');
 
   console.log(`🔐 Public key used for encryption (${recipient}):\n${recipientPublicKey}`);
-  const messageToEncrypt = isObjectContent ? JSON.stringify(messageObject) : messageObject;
+  const messageToEncrypt = JSON.stringify(decryptedBlock);
   console.log(`✉️ Message to encrypt: "${messageToEncrypt}"`);
   const encryptedMessage = encryptMessage(recipientPublicKey, messageToEncrypt);
 
