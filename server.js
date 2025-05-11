@@ -261,6 +261,8 @@ app.post('/send-message', async (req, res) => {
     return res.status(400).json({ error: 'Missing sender, recipient, or content' });
   }
 
+  const isObjectContent = typeof content === 'object' && content !== null;
+
   const activity = {
     "@context": "https://www.w3.org/ns/activitystreams",
     "type": "Create",
@@ -268,7 +270,7 @@ app.post('/send-message', async (req, res) => {
     "published": new Date().toISOString(),
     "object": {
       "type": "Note",
-      "content": content,
+      "content": isObjectContent ? JSON.stringify(content) : content,
       "to": [`${base}/user/${recipient.toLowerCase()}`]
     }
   };
@@ -289,8 +291,9 @@ app.post('/send-message', async (req, res) => {
   const recipientPublicKey = fs.readFileSync(recipientKeyPath, 'utf8');
 
   console.log(`🔐 Public key used for encryption (${recipient}):\n${recipientPublicKey}`);
-  console.log(`✉️ Message to encrypt: "${content}"`);
-  const encryptedMessage = encryptMessage(recipientPublicKey, content);
+  const messageToEncrypt = isObjectContent ? JSON.stringify(content) : content;
+  console.log(`✉️ Message to encrypt: "${messageToEncrypt}"`);
+  const encryptedMessage = encryptMessage(recipientPublicKey, messageToEncrypt);
 
   const inboxUrl = `${base}/inbox/${recipient.toLowerCase()}`;
   const date = new Date().toUTCString();
