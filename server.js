@@ -255,24 +255,26 @@ app.get('/user/:username/following', verifyToken, async (req, res) => {
 });
 
 app.post('/send-message', async (req, res) => {
-  const { sender, recipient, content } = req.body;
+  const { sender, recipient, content, block } = req.body;
 
-  if (!sender || !recipient || !content) {
-    return res.status(400).json({ error: 'Missing sender, recipient, or content' });
+  if (!sender || !recipient || (!content && !block)) {
+    return res.status(400).json({ error: 'Missing sender, recipient, or content/block' });
   }
 
-  const isObjectContent = typeof content === 'object' && content !== null;
+  // Determine what to use for the message
+  const messageObject = block || content;
+  const isObjectContent = typeof messageObject === 'object' && messageObject !== null;
 
   const activity = {
-    "@context": "https://www.w3.org/ns/activitystreams",
-    "type": "Create",
-    "actor": `${base}/user/${sender.toLowerCase()}`,
-    "published": new Date().toISOString(),
-    "object": {
-      "type": "Note",
-      "content": isObjectContent ? JSON.stringify(content) : content,
-      "to": [`${base}/user/${recipient.toLowerCase()}`]
-    }
+  "@context": "https://www.w3.org/ns/activitystreams",
+  "type": "Create",
+  "actor": `${base}/user/${sender.toLowerCase()}`,
+  "published": new Date().toISOString(),
+  "object": {
+    "type": "Note",
+    "content": isObjectContent ? JSON.stringify(messageObject) : messageObject,
+    "to": [`${base}/user/${recipient.toLowerCase()}`]
+  }
   };
  
 
@@ -291,7 +293,7 @@ app.post('/send-message', async (req, res) => {
   const recipientPublicKey = fs.readFileSync(recipientKeyPath, 'utf8');
 
   console.log(`🔐 Public key used for encryption (${recipient}):\n${recipientPublicKey}`);
-  const messageToEncrypt = isObjectContent ? JSON.stringify(content) : content;
+  const messageToEncrypt = isObjectContent ? JSON.stringify(messageObject) : messageObject;
   console.log(`✉️ Message to encrypt: "${messageToEncrypt}"`);
   const encryptedMessage = encryptMessage(recipientPublicKey, messageToEncrypt);
 
