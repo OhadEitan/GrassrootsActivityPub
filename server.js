@@ -24,6 +24,32 @@ async function authenticateUser(username, password) {
   return await bcrypt.compare(password, hashed);
 }
 
+
+function encryptWithHybrid(message, publicKeyPem) {
+  const aesKey = crypto.randomBytes(32);  // AES-256
+  const iv = crypto.randomBytes(16);      // Initialization Vector
+
+  const cipher = crypto.createCipheriv('aes-256-cbc', aesKey, iv);
+  const paddedMsg = Buffer.concat([Buffer.from(message, 'utf8'), Buffer.alloc(16 - (message.length % 16), 16 - (message.length % 16))]);
+  const encryptedBlock = Buffer.concat([cipher.update(paddedMsg), cipher.final()]);
+
+  const encryptedKey = crypto.publicEncrypt(
+    {
+      key: publicKeyPem,
+      padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
+      oaepHash: 'sha256'
+    },
+    aesKey
+  );
+
+  return {
+    encrypted_block: encryptedBlock.toString('base64'),
+    encrypted_key: encryptedKey.toString('base64'),
+    iv: iv.toString('base64')
+  };
+}
+
+
 function hybridDecrypt(encryptedKeyB64, encryptedBlockB64, ivB64, privateKeyPem) {
   const encryptedKey = Buffer.from(encryptedKeyB64, 'base64');
   const iv = Buffer.from(ivB64, 'base64');
@@ -39,8 +65,7 @@ function hybridDecrypt(encryptedKeyB64, encryptedBlockB64, ivB64, privateKeyPem)
   );
 
   const decipher = crypto.createDecipheriv('aes-256-cbc', aesKey, iv);
-  let decrypted = decipher.update(encryptedBlock);
-  decrypted = Buffer.concat([decrypted, decipher.final()]);
+  let decrypted = Buffer.concat([decipher.update(encryptedBlock), decipher.final()]);
 
   const padLen = decrypted[decrypted.length - 1];
   return JSON.parse(decrypted.slice(0, -padLen).toString());
@@ -279,34 +304,19 @@ app.get('/user/:username/following', verifyToken, async (req, res) => {
 });
 
 app.post('/send-message', async (req, res) => {
-  const { sender, recipient, content, block, encrypted_block, encrypted_key, iv } = req.body;
+  const { sender, recipient, content, block } = req.body;
 
   if (!sender || !recipient) {
     return res.status(400).json({ error: 'Missing sender or recipient' });
   }
 
-  const isHybrid = encrypted_block && encrypted_key && iv;
-
-  let decryptedBlock;
-  if (isHybrid) {
-    try {
-      const recipientPrivateKey = fs.readFileSync(
-        path.join(__dirname, 'user', recipient.toLowerCase(), 'private-key.pem'),
-        'utf8'
-      );
-      decryptedBlock = hybridDecrypt(encrypted_key, encrypted_block, iv, recipientPrivateKey);
-      console.log("🔓 Decrypted hybrid block:", decryptedBlock);
-    } catch (err) {
-      console.error("❌ Hybrid decryption failed:", err.message);
-      return res.status(400).json({ error: 'Hybrid decryption failed', details: err.message });
-    }
-  } else if (content || block) {
-    decryptedBlock = content || block;
-  } else {
-    return res.status(400).json({ error: 'Missing message payload' });
+  // 📦 Determine message content
+  const payload = content || block;
+  if (!payload) {
+    return res.status(400).json({ error: 'Missing content or block' });
   }
 
-  // ✅ Now define activity AFTER decryptedBlock is initialized
+  // 📝 Create ActivityPub message
   const activity = {
     "@context": "https://www.w3.org/ns/activitystreams",
     "type": "Create",
@@ -314,28 +324,34 @@ app.post('/send-message', async (req, res) => {
     "published": new Date().toISOString(),
     "object": {
       "type": "Note",
-      "content": JSON.stringify(decryptedBlock),
+      "content": JSON.stringify(payload),
       "to": [`${base}/user/${recipient.toLowerCase()}`]
     }
   };
 
-  // Write to sender's outbox
+  // 📨 Save to outbox
   const outboxDir = path.join(__dirname, 'outbox', sender.toLowerCase());
   if (!fs.existsSync(outboxDir)) fs.mkdirSync(outboxDir, { recursive: true });
   fs.writeFileSync(path.join(outboxDir, `${Date.now()}.json`), JSON.stringify(activity, null, 2));
   if (!activities[sender.toLowerCase()]) activities[sender.toLowerCase()] = [];
   activities[sender.toLowerCase()].push(activity);
 
-  // Encrypt and forward to recipient
+  // 🔐 Encrypt message with hybrid encryption
   const recipientKeyPath = path.join(__dirname, 'user', recipient.toLowerCase(), 'public-key.pem');
   if (!fs.existsSync(recipientKeyPath)) {
     return res.status(404).json({ error: `Public key for ${recipient} not found` });
   }
 
   const recipientPublicKey = fs.readFileSync(recipientKeyPath, 'utf8');
-  const messageToEncrypt = JSON.stringify(decryptedBlock);
-  const encryptedMessage = encryptMessage(recipientPublicKey, messageToEncrypt);
+  const { encrypted_block, encrypted_key, iv } = encryptWithHybrid(JSON.stringify(payload), recipientPublicKey);
 
+  const inboxDir = path.join(__dirname, 'inbox', recipient.toLowerCase());
+  if (!fs.existsSync(inboxDir)) fs.mkdirSync(inboxDir, { recursive: true });
+  fs.writeFileSync(path.join(inboxDir, `${Date.now()}.json`), JSON.stringify({
+    encrypted_block, encrypted_key, iv
+  }, null, 2));
+
+  // ✍️ HTTP Signature
   const inboxUrl = `${base}/inbox/${recipient.toLowerCase()}`;
   const date = new Date().toUTCString();
   const digest = `SHA-256=${crypto.createHash('sha256').update(JSON.stringify(activity)).digest('base64')}`;
@@ -367,24 +383,20 @@ app.post('/send-message', async (req, res) => {
       body: JSON.stringify(activity)
     });
 
-    const inboxDir = path.join(__dirname, 'inbox', recipient.toLowerCase());
-    if (!fs.existsSync(inboxDir)) fs.mkdirSync(inboxDir, { recursive: true });
-    fs.writeFileSync(path.join(inboxDir, `${Date.now()}.json`), JSON.stringify({ encryptedMessage }, null, 2));
-
     if (response.ok) {
       res.status(200).json({
-        status: 'Message sent and encrypted successfully',
-        sentAt: new Date().toISOString(),
-        plaintext: decryptedBlock
+        status: 'Message received and encrypted',
+        sentAt: new Date().toISOString()
       });
     } else {
       const errorText = await response.text();
-      res.status(response.status).json({ error: 'Failed to deliver message', details: errorText });
+      res.status(response.status).json({ error: 'Forwarding failed', details: errorText });
     }
   } catch (err) {
-    res.status(500).json({ error: 'Failed to send signed message', details: err.message });
+    res.status(500).json({ error: 'Server error forwarding message', details: err.message });
   }
 });
+
 
 app.get('/decrypt/:username', verifyToken, async (req, res) => {
   const username = req.params.username.toLowerCase();
