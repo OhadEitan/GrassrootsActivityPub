@@ -287,6 +287,18 @@ app.post('/send-message', async (req, res) => {
 
   const isHybrid = encrypted_block && encrypted_key && iv;
 
+  const activity = {
+    "@context": "https://www.w3.org/ns/activitystreams",
+    "type": "Create",
+    "actor": `${base}/user/${sender.toLowerCase()}`,
+    "published": new Date().toISOString(),
+    "object": {
+      "type": "Note",
+      "content": JSON.stringify(decryptedBlock),
+      "to": [`${base}/user/${recipient.toLowerCase()}`]
+    }
+  };
+
   let decryptedBlock;
   if (isHybrid) {
     try {
