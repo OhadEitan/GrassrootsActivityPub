@@ -400,7 +400,9 @@ app.post('/send-message', async (req, res) => {
 
 app.get('/decrypt/:username', verifyToken, async (req, res) => {
   const username = req.params.username.toLowerCase();
-  if (req.user.username !== username) return res.status(403).json({ error: 'Forbidden' });
+  if (req.user.username !== username) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
 
   const inboxDir = path.join(__dirname, 'inbox', username);
   const privateKeyPath = path.join(__dirname, 'user', username, 'private-key.pem');
@@ -411,15 +413,28 @@ app.get('/decrypt/:username', verifyToken, async (req, res) => {
 
   const privateKeyPem = fs.readFileSync(privateKeyPath, 'utf8');
   const files = fs.readdirSync(inboxDir).sort();
-  const decryptedMessages = files.map(filename => {
-    const content = fs.readFileSync(path.join(inboxDir, filename));
-    const { encryptedMessage } = JSON.parse(content);
-    const decrypted = decryptMessage(privateKeyPem, encryptedMessage);
-    return { filename, decrypted };
-  });
+
+  const decryptedMessages = [];
+
+  for (const filename of files) {
+    try {
+      const content = fs.readFileSync(path.join(inboxDir, filename), 'utf8');
+      const { encrypted_block, encrypted_key, iv } = JSON.parse(content);
+
+      if (encrypted_block && encrypted_key && iv) {
+        const decrypted = hybridDecrypt(encrypted_key, encrypted_block, iv, privateKeyPem);
+        decryptedMessages.push({ filename, decrypted });
+      } else {
+        decryptedMessages.push({ filename, error: "Missing encrypted fields" });
+      }
+    } catch (err) {
+      decryptedMessages.push({ filename, error: err.message });
+    }
+  }
 
   res.json(decryptedMessages);
 });
+
 
 app.post('/follow', (req, res) => {
   const { actor, target } = req.body;
