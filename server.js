@@ -290,7 +290,10 @@ app.post('/send-message', async (req, res) => {
   let decryptedBlock;
   if (isHybrid) {
     try {
-      const recipientPrivateKey = fs.readFileSync(path.join(__dirname, 'user', recipient.toLowerCase(), 'private-key.pem'), 'utf8');
+      const recipientPrivateKey = fs.readFileSync(
+        path.join(__dirname, 'user', recipient.toLowerCase(), 'private-key.pem'),
+        'utf8'
+      );
       decryptedBlock = hybridDecrypt(encrypted_key, encrypted_block, iv, recipientPrivateKey);
       console.log("🔓 Decrypted hybrid block:", decryptedBlock);
     } catch (err) {
@@ -303,7 +306,7 @@ app.post('/send-message', async (req, res) => {
     return res.status(400).json({ error: 'Missing message payload' });
   }
 
-  // ✅ Now define activity after decryptedBlock is available
+  // ✅ Now define activity AFTER decryptedBlock is initialized
   const activity = {
     "@context": "https://www.w3.org/ns/activitystreams",
     "type": "Create",
@@ -315,25 +318,22 @@ app.post('/send-message', async (req, res) => {
       "to": [`${base}/user/${recipient.toLowerCase()}`]
     }
   };
-    
 
+  // Write to sender's outbox
   const outboxDir = path.join(__dirname, 'outbox', sender.toLowerCase());
   if (!fs.existsSync(outboxDir)) fs.mkdirSync(outboxDir, { recursive: true });
   fs.writeFileSync(path.join(outboxDir, `${Date.now()}.json`), JSON.stringify(activity, null, 2));
   if (!activities[sender.toLowerCase()]) activities[sender.toLowerCase()] = [];
   activities[sender.toLowerCase()].push(activity);
 
+  // Encrypt and forward to recipient
   const recipientKeyPath = path.join(__dirname, 'user', recipient.toLowerCase(), 'public-key.pem');
   if (!fs.existsSync(recipientKeyPath)) {
     return res.status(404).json({ error: `Public key for ${recipient} not found` });
   }
 
-  
   const recipientPublicKey = fs.readFileSync(recipientKeyPath, 'utf8');
-
-  console.log(`🔐 Public key used for encryption (${recipient}):\n${recipientPublicKey}`);
   const messageToEncrypt = JSON.stringify(decryptedBlock);
-  console.log(`✉️ Message to encrypt: "${messageToEncrypt}"`);
   const encryptedMessage = encryptMessage(recipientPublicKey, messageToEncrypt);
 
   const inboxUrl = `${base}/inbox/${recipient.toLowerCase()}`;
@@ -345,7 +345,7 @@ app.post('/send-message', async (req, res) => {
     return res.status(404).json({ error: `Private key for ${sender} not found` });
   }
   const senderPrivateKey = fs.readFileSync(senderPrivKeyPath, 'utf8');
-  
+
   const signatureHeader = createHTTPSignature({
     privateKey: senderPrivateKey,
     keyId,
@@ -375,7 +375,7 @@ app.post('/send-message', async (req, res) => {
       res.status(200).json({
         status: 'Message sent and encrypted successfully',
         sentAt: new Date().toISOString(),
-        plaintext: content
+        plaintext: decryptedBlock
       });
     } else {
       const errorText = await response.text();
