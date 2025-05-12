@@ -287,23 +287,10 @@ app.post('/send-message', async (req, res) => {
 
   const isHybrid = encrypted_block && encrypted_key && iv;
 
-  const activity = {
-    "@context": "https://www.w3.org/ns/activitystreams",
-    "type": "Create",
-    "actor": `${base}/user/${sender.toLowerCase()}`,
-    "published": new Date().toISOString(),
-    "object": {
-      "type": "Note",
-      "content": JSON.stringify(decryptedBlock),
-      "to": [`${base}/user/${recipient.toLowerCase()}`]
-    }
-  };
-
   let decryptedBlock;
   if (isHybrid) {
     try {
       const recipientPrivateKey = fs.readFileSync(path.join(__dirname, 'user', recipient.toLowerCase(), 'private-key.pem'), 'utf8');
-
       decryptedBlock = hybridDecrypt(encrypted_key, encrypted_block, iv, recipientPrivateKey);
       console.log("🔓 Decrypted hybrid block:", decryptedBlock);
     } catch (err) {
@@ -315,7 +302,20 @@ app.post('/send-message', async (req, res) => {
   } else {
     return res.status(400).json({ error: 'Missing message payload' });
   }
-  
+
+  // ✅ Now define activity after decryptedBlock is available
+  const activity = {
+    "@context": "https://www.w3.org/ns/activitystreams",
+    "type": "Create",
+    "actor": `${base}/user/${sender.toLowerCase()}`,
+    "published": new Date().toISOString(),
+    "object": {
+      "type": "Note",
+      "content": JSON.stringify(decryptedBlock),
+      "to": [`${base}/user/${recipient.toLowerCase()}`]
+    }
+  };
+    
 
   const outboxDir = path.join(__dirname, 'outbox', sender.toLowerCase());
   if (!fs.existsSync(outboxDir)) fs.mkdirSync(outboxDir, { recursive: true });
