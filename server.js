@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-key';
+const users = {}; // Global user store
 
 const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 
@@ -172,10 +173,10 @@ app.post('/create-user/:username', async (req, res) => {
   if (!password || password.length < 4) {
     return res.status(400).json({ error: 'Password must be at least 4 characters' });
   }
+
   const userDir = path.join(__dirname, 'user', username);
   const inboxDir = path.join(__dirname, 'inbox', username);
   const outboxDir = path.join(__dirname, 'outbox', username);
-
 
   if (fs.existsSync(userDir)) {
     return res.status(400).json({ error: `User '${username}' already exists.` });
@@ -224,8 +225,19 @@ app.post('/create-user/:username', async (req, res) => {
   followers[username] = [];
   activities[username] = [];
 
+  // Expose user record in memory for lookups
+  users[username] = {
+    publicKey,
+    privateKey,
+    profile,
+    inbox: [],
+    outbox: []
+  };
+
   res.status(201).json({ status: `User '${username}' created successfully` });
 });
+
+
 
 app.get('/inbox/:username', verifyToken, async (req, res) => {
   const username = req.params.username.toLowerCase();
