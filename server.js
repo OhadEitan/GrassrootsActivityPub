@@ -435,6 +435,20 @@ app.get('/decrypt/:username', verifyToken, async (req, res) => {
   res.json(decryptedMessages);
 });
 
+app.get("/users/:username/public-key", (req, res) => {
+    const username = req.params.username;
+    const user = users[username]; // or wherever you store them
+
+    if (!user || !user.publicKey) {
+        return res.status(404).json({ error: "User not found or missing public key" });
+    }
+
+    res.json({
+        username,
+        public_key: user.publicKey
+    });
+});
+
 
 app.post('/follow', (req, res) => {
   const { actor, target } = req.body;
