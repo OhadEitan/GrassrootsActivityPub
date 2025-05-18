@@ -316,16 +316,17 @@ app.get('/user/:username/following', verifyToken, async (req, res) => {
 });
 
 app.post('/send-message', async (req, res) => {
-  const { sender, recipient, content, block } = req.body;
+  const { sender, recipient, content, block, encrypted_block, encrypted_key, iv } = req.body;
+
 
   if (!sender || !recipient) {
     return res.status(400).json({ error: 'Missing sender or recipient' });
   }
 
   // 📦 Determine message content
-  const payload = content || block;
+  const payload = content || block || encrypted_block;
   if (!payload) {
-    return res.status(400).json({ error: 'Missing content or block' });
+    return res.status(400).json({ error: 'Missing content, block, or encrypted_block' });
   }
 
   // 📝 Create ActivityPub message
