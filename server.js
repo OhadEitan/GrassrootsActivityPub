@@ -349,8 +349,20 @@ app.post('/send-message', async (req, res) => {
   activities[sender.toLowerCase()].push(activity);
 
   // ✅ Use encrypted values provided by client
-  if (!encrypted_block || !encrypted_key || !iv) {
-    return res.status(400).json({ error: 'Missing encrypted payload fields from client' });
+  if (block) {
+    // Unencrypted message (e.g., friendship offer) – just forward it
+    const inboxDir = path.join(__dirname, 'inbox', recipient.toLowerCase());
+    if (!fs.existsSync(inboxDir)) fs.mkdirSync(inboxDir, { recursive: true });
+    fs.writeFileSync(path.join(inboxDir, `${Date.now()}.json`), JSON.stringify({ block }, null, 2));
+  } else if (encrypted_block && encrypted_key && iv) {
+    // Encrypted message – standard hybrid payload
+    const inboxDir = path.join(__dirname, 'inbox', recipient.toLowerCase());
+    if (!fs.existsSync(inboxDir)) fs.mkdirSync(inboxDir, { recursive: true });
+    fs.writeFileSync(path.join(inboxDir, `${Date.now()}.json`), JSON.stringify({
+      encrypted_block, encrypted_key, iv
+    }, null, 2));
+  } else {
+    return res.status(400).json({ error: 'Missing content or encrypted payload fields' });
   }
 
   const inboxDir = path.join(__dirname, 'inbox', recipient.toLowerCase());
