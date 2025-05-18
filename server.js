@@ -444,18 +444,17 @@ app.get('/decrypt/:username', verifyToken, async (req, res) => {
 });
 
 app.get("/users/:username/public-key", (req, res) => {
-    const username = req.params.username;
-    const user = users[username]; // or wherever you store them
+  const username = req.params.username.toLowerCase();
+  const keyPath = path.join(__dirname, "user", username, "public-key.pem");
 
-    if (!user || !user.publicKey) {
-        return res.status(404).json({ error: "User not found or missing public key" });
-    }
+  if (!fs.existsSync(keyPath)) {
+    return res.status(404).json({ error: "Public key not found" });
+  }
 
-    res.json({
-        username,
-        public_key: user.publicKey
-    });
+  const publicKey = fs.readFileSync(keyPath, 'utf8');
+  res.json({ username, public_key: publicKey });
 });
+
 
 
 app.post('/follow', (req, res) => {
