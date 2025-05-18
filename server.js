@@ -318,12 +318,11 @@ app.get('/user/:username/following', verifyToken, async (req, res) => {
 app.post('/send-message', async (req, res) => {
   const { sender, recipient, content, block, encrypted_block, encrypted_key, iv } = req.body;
 
-
   if (!sender || !recipient) {
     return res.status(400).json({ error: 'Missing sender or recipient' });
   }
 
-  // 📦 Determine message content
+  // 📦 Determine message content (only for ActivityPub logging)
   const payload = content || block || encrypted_block;
   if (!payload) {
     return res.status(400).json({ error: 'Missing content, block, or encrypted_block' });
@@ -349,14 +348,10 @@ app.post('/send-message', async (req, res) => {
   if (!activities[sender.toLowerCase()]) activities[sender.toLowerCase()] = [];
   activities[sender.toLowerCase()].push(activity);
 
-  // 🔐 Encrypt message with hybrid encryption
-  const recipientKeyPath = path.join(__dirname, 'user', recipient.toLowerCase(), 'public-key.pem');
-  if (!fs.existsSync(recipientKeyPath)) {
-    return res.status(404).json({ error: `Public key for ${recipient} not found` });
+  // ✅ Use encrypted values provided by client
+  if (!encrypted_block || !encrypted_key || !iv) {
+    return res.status(400).json({ error: 'Missing encrypted payload fields from client' });
   }
-
-  const recipientPublicKey = fs.readFileSync(recipientKeyPath, 'utf8');
-  const { encrypted_block, encrypted_key, iv } = encryptWithHybrid(JSON.stringify(payload), recipientPublicKey);
 
   const inboxDir = path.join(__dirname, 'inbox', recipient.toLowerCase());
   if (!fs.existsSync(inboxDir)) fs.mkdirSync(inboxDir, { recursive: true });
